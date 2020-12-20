@@ -521,44 +521,18 @@ void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex)
 	csndAdpcmStateSet = 1;
 }
 
-Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, void* data0, void* data1, u32 size)
+static Result csndPlaySoundImpl(int chn, u32 flags, u32 sampleRate, float vol, float pan, u32 paddr0, u32 paddr1, u32 size, int adpcmSample, int adpcmIndex)
 {
 	if (!(csndChannels & BIT(chn)))
 		return 1;
-
-	u32 paddr0 = 0, paddr1 = 0;
 
 	int encoding = (flags >> 12) & 3;
 	int loopMode = (flags >> 10) & 3;
 
 	if (!loopMode) flags |= SOUND_ONE_SHOT;
 
-	if (encoding != CSND_ENCODING_PSG)
-	{
-		if (data0) paddr0 = osConvertVirtToPhys(data0);
-		if (data1) paddr1 = osConvertVirtToPhys(data1);
-
-		if (data0 && encoding == CSND_ENCODING_ADPCM)
-		{
-			int adpcmSample;
-			int adpcmIndex;
-
-			if (csndAdpcmStateSet)
-			{
-				adpcmSample = csndAdpcmStateSample;
-				adpcmIndex = csndAdpcmStateIndex;
-				csndAdpcmStateSet = 0;
-			}
-			else
-			{   
-				// If the adpcm state is not set, it is taken from before the start of the data0 buffer.
-				adpcmSample = ((s16*)data0)[-2];
-				adpcmIndex = ((u8*)data0)[-2];
-			}
-			
-			CSND_SetAdpcmState(chn, 0, adpcmSample, adpcmIndex);
-		}
-	}
+	if (encoding == CSND_ENCODING_ADPCM)
+		CSND_SetAdpcmState(chn, 0, adpcmSample, adpcmIndex);
 
 	u32 timer = CSND_TIMER(sampleRate);
 	if (timer < 0x0042) timer = 0x0042;
@@ -577,6 +551,62 @@ Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, v
 	}
 
 	return csndExecCmds(true);
+}
+
+Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, void* data0, void* data1, u32 size)
+{
+	int adpcmSample = 0;
+	int adpcmIndex = 0;
+	u32 paddr0 = 0, paddr1 = 0;
+	int encoding = (flags >> 12) & 3;
+
+	if (encoding != CSND_ENCODING_PSG)
+	{
+		if (data0) paddr0 = osConvertVirtToPhys(data0);
+		if (data1) paddr1 = osConvertVirtToPhys(data1);
+
+		if (encoding == CSND_ENCODING_ADPCM)
+		{
+			if (csndAdpcmStateSet)
+			{
+				adpcmSample = csndAdpcmStateSample;
+				adpcmIndex = csndAdpcmStateIndex;
+				csndAdpcmStateSet = 0;
+			}
+			else if (data0)
+			{   
+				// If the adpcm state is not set, it is taken from before the start of the data0 buffer.
+				adpcmSample = ((s16*)data0)[-2];
+				adpcmIndex = ((u8*)data0)[-2];
+			}
+		}
+	}
+	
+	return csndPlaySoundImpl(chn, flags, sampleRate, vol, pan, paddr0, paddr1, size, adpcmSample, adpcmIndex);
+}
+
+Result csndPlaySoundPhys(int chn, u32 flags, u32 sampleRate, float vol, float pan, u32 paddr0, u32 paddr1, u32 size)
+{
+	int adpcmSample = 0;
+	int adpcmIndex = 0;
+	int encoding = (flags >> 12) & 3;
+
+	if (encoding == CSND_ENCODING_ADPCM)
+	{
+		if (csndAdpcmStateSet)
+		{
+			adpcmSample = csndAdpcmStateSample;
+			adpcmIndex = csndAdpcmStateIndex;
+			csndAdpcmStateSet = 0;
+		}
+		else
+		{   
+			// Adpcm state cannot be obtained from a physical address, so an error code is returned.
+			return MAKERESULT(RL_PERMANENT, RS_INVALIDSTATE, RM_CSND, RD_NOT_INITIALIZED);
+		}
+	}
+	
+	return csndPlaySoundImpl(chn, flags, sampleRate, vol, pan, paddr0, paddr1, size, adpcmSample, adpcmIndex);
 }
 
 void csndGetDspFlags(u32* outSemFlags, u32* outIrqFlags)

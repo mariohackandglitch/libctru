@@ -380,7 +380,7 @@ Result CSND_SetDspFlags(bool waitDone);
 Result CSND_UpdateInfo(bool waitDone);
 
 /**
- * @brief Sets the ADPCM sample and index for the next csndPlaySound call.
+ * @brief Sets the ADPCM sample and index for the next csndPlaySound/csndPlaySoundPhys call.
  * @param adpcmSample ADPCM sample.
  * @param adpcmIndex ADPCM index.
  */
@@ -400,6 +400,21 @@ void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex);
  * In this implementation if the loop mode is used, data1 must be in the range [data0 ; data0 + size]. Sound will be played once from data0 to data0 + size and then loop between data1 and data0+size.
  */
 Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, void* data0, void* data1, u32 size);
+
+/**
+ * @brief Plays a sound. Same as csndPlaySound, but takes a physical address for the sound data instead.
+ * @param chn Channel to play the sound on.
+ * @param flags Flags containing information about the sound.
+ * @param sampleRate Sample rate of the sound.
+ * @param vol The volume, ranges from 0.0 to 1.0 included.
+ * @param pan The pan, ranges from -1.0 to 1.0 included.
+ * @param paddr0 Physical address of first block of sound data.
+ * @param paddr1 Physical address of second block of sound data. This is the block that will be looped over.
+ * @param size Size of the sound data.
+ *
+ * In this implementation if the loop mode is used, paddr1 must be in the range [paddr0 ; paddr0 + size]. Sound will be played once from paddr0 to paddr0 + size and then loop between paddr1 and paddr0+size.
+ */
+Result csndPlaySoundPhys(int chn, u32 flags, u32 sampleRate, float vol, float pan, u32 paddr0, u32 paddr1, u32 size);
 
 /**
  * @brief Gets CSND's DSP flags.
