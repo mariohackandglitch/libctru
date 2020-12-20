@@ -380,6 +380,13 @@ Result CSND_SetDspFlags(bool waitDone);
 Result CSND_UpdateInfo(bool waitDone);
 
 /**
+ * @brief Sets the ADPCM sample and index for the next csndPlaySound call.
+ * @param adpcmSample ADPCM sample.
+ * @param adpcmIndex ADPCM index.
+ */
+void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex);
+
+/**
  * @brief Plays a sound.
  * @param chn Channel to play the sound on.
  * @param flags Flags containing information about the sound.

@@ -26,6 +26,10 @@ static u32 csndCmdBlockSize = 0x2000;
 static u32 csndCmdStartOff;
 static u32 csndCmdCurOff;
 
+static int csndAdpcmStateSample;
+static int csndAdpcmStateIndex;
+static u8 csndAdpcmStateSet = 0;
+
 static Result CSND_Initialize(Handle* mutex, Handle* sharedMem, u32 sharedMemSize, u32* offsets)
 {
 	Result ret=0;
@@ -510,6 +514,13 @@ Result CSND_UpdateInfo(bool waitDone)
 	return csndExecCmds(waitDone);
 }
 
+void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex)
+{
+	csndAdpcmStateSample = adpcmSample;
+	csndAdpcmStateIndex = adpcmIndex;
+	csndAdpcmStateSet = 1;
+}
+
 Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, void* data0, void* data1, u32 size)
 {
 	if (!(csndChannels & BIT(chn)))
@@ -529,8 +540,22 @@ Result csndPlaySound(int chn, u32 flags, u32 sampleRate, float vol, float pan, v
 
 		if (data0 && encoding == CSND_ENCODING_ADPCM)
 		{
-			int adpcmSample = ((s16*)data0)[-2];
-			int adpcmIndex = ((u8*)data0)[-2];
+			int adpcmSample;
+			int adpcmIndex;
+
+			if (csndAdpcmStateSet)
+			{
+				adpcmSample = csndAdpcmStateSample;
+				adpcmIndex = csndAdpcmStateIndex;
+				csndAdpcmStateSet = 0;
+			}
+			else
+			{   
+				// If the adpcm state is not set, it is taken from before the start of the data0 buffer.
+				adpcmSample = ((s16*)data0)[-2];
+				adpcmIndex = ((u8*)data0)[-2];
+			}
+			
 			CSND_SetAdpcmState(chn, 0, adpcmSample, adpcmIndex);
 		}
 	}
