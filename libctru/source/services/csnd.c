@@ -72,6 +72,20 @@ static Result CSND_ExecuteCommands(u32 offset)
 	return (Result)cmdbuf[1];
 }
 
+Result CSND_PlaySoundDirectly(u32 unknown0, u32 unknown1)
+{
+	Result ret=0;
+	u32 *cmdbuf = getThreadCommandBuffer();
+
+	cmdbuf[0] = IPC_MakeHeader(0x4,2,0); // 0x40080
+	cmdbuf[1] = unknown0;
+	cmdbuf[2] = unknown1;
+
+	if(R_FAILED(ret = svcSendSyncRequest(csndHandle)))return ret;
+
+	return (Result)cmdbuf[1];
+}
+
 static Result CSND_AcquireSoundChannels(u32* channelMask)
 {
 	Result ret=0;
@@ -195,11 +209,11 @@ Result csndInit(void)
 	if (R_FAILED(ret)) goto cleanup0;
 
 	// Calculate offsets and sizes required by the CSND module
-	csndOffsets[0] = csndCmdBlockSize;                         // Offset to DSP semaphore and irq disable flags
-	csndOffsets[1] = csndOffsets[0] + 8;                       // Offset to sound channel information
-	csndOffsets[2] = csndOffsets[1] + 32*sizeof(CSND_ChnInfo); // Offset to capture unit information
-	csndOffsets[3] = csndOffsets[2] + 2*8;                     // Offset to the input of command 0x00040080
-	csndSharedMemSize = csndOffsets[3] + 0x3C;                 // Total size of the CSND shared memory
+	csndOffsets[0] = csndCmdBlockSize;                         			// Offset to DSP semaphore and irq disable flags
+	csndOffsets[1] = csndOffsets[0] + 8;                       			// Offset to sound channel information
+	csndOffsets[2] = csndOffsets[1] + 32*sizeof(CSND_ChnInfo); 			// Offset to capture unit information
+	csndOffsets[3] = csndOffsets[2] + 2*8;                     			// Offset to the direct sound struct
+	csndSharedMemSize = csndOffsets[3] + sizeof(CSND_DirectSound);      // Total size of the CSND shared memory
 
 	ret = CSND_Initialize(&csndMutex, &csndSharedMemBlock, csndSharedMemSize, csndOffsets);
 	if (R_FAILED(ret)) goto cleanup1;
@@ -519,6 +533,31 @@ void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex)
 	csndAdpcmStateSample = adpcmSample;
 	csndAdpcmStateIndex = adpcmIndex;
 	csndAdpcmStateSet = 1;
+}
+
+void csndInitializeDirectSound(CSND_DirectSound* sound)
+{
+	memset(sound, 0, sizeof(CSND_DirectSound));
+
+	sound->soundOutputMode = CSND_SOUNDOUTPUT_STEREO;
+	sound->soundModifiers.channelVolumes[0] = CSND_DIRECTSOUND_MAX_VOLUME;
+	sound->soundModifiers.channelVolumes[1] = CSND_DIRECTSOUND_MAX_VOLUME;
+	sound->soundModifiers.unknown1 = 1.f;
+	sound->soundModifiers.speedMultiplier = 1.f;
+}
+
+Result csndPlayDirectSound(CSND_DirectSound* sound, bool isVAddr)
+{
+	if (isVAddr)
+	{
+		if (sound->channelData.sampleData[0]) sound->channelData.sampleData[0] = (void*)osConvertVirtToPhys(sound->channelData.sampleData[0]);
+		if (sound->channelData.sampleData[1]) sound->channelData.sampleData[1] = (void*)osConvertVirtToPhys(sound->channelData.sampleData[1]);
+	}
+
+	CSND_DirectSound* sharedMemSound = (CSND_DirectSound*)((vu8*)csndSharedMem + csndOffsets[3]);
+	memcpy(sharedMemSound, sound, sizeof(CSND_DirectSound));
+
+	return CSND_PlaySoundDirectly(0, 0);
 }
 
 static Result csndPlaySoundImpl(int chn, u32 flags, u32 sampleRate, float vol, float pan, u32 paddr0, u32 paddr1, u32 size, int adpcmSample, int adpcmIndex)

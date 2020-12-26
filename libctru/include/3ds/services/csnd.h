@@ -98,6 +98,60 @@ typedef enum
 	DutyCycle_87 = 6  ///< 87.5% duty cycle
 } CSND_DutyCycle;
 
+/// Represents the max volume for a direct sound.
+#define CSND_DIRECTSOUND_MAX_VOLUME 32768
+
+/// Output modes for a direct sound.
+typedef enum
+{
+	CSND_SOUNDOUTPUT_MONO = 0,
+	CSND_SOUNDOUTPUT_STEREO = 1
+} CSND_SoundOutputMode;
+
+/// IMA ADPCM context for a direct sound (https://www.3dbrew.org/wiki/BCWAV#IMA_ADPCM_Context) 
+typedef struct
+{
+    u16 data;
+    u8 tableIndex;
+    u8 padding;
+} CSND_DirectSoundIMAADPCMContext;
+
+/// Channel related data for a direct sound.
+typedef struct 
+{
+	u8 channelAmount; ///< Amount of channels used, either 1 or 2.
+	u8 channelEncoding; ///< Sample encoding.
+	u8 padding[2]; ///< Padding.
+	u32 sampleRate; ///< Sample rate for both channels.
+	void* sampleData[2]; ///< Pointers to the sample data linear memory buffers (must be equal size).
+	u32 sampleDataLength; ///< Size of the sample data buffer (for a single channel).
+	CSND_DirectSoundIMAADPCMContext adpcmContext[2]; ///< IMA ADPCM context for each channel.
+} CSND_DirectSoundChannelData;
+
+/// Modifiers applied to a direct sound.
+typedef struct
+{
+	float speedMultiplier; ///< Sound playback speed, default: 1.
+	s32 channelVolumes[2]; ///< Volume of each individual channel, max: 32768.
+	u8 unknown0; ///< Unknown
+	u8 padding[3]; ///< Padding? Never used.
+	float unknown1; ///< Unknown, seems to be set to 1. Some sort of play delay?
+	u32 unknown2; ///< Unknown, maybe related to unknown1. Some sort of play delay?
+	u8 ignoreVolumeSlider; ///< Set to 1 to play at maximum volume, ignoring the volume slider.
+	u8 forceSpeakerOutput; ///< Set to 1 to play on the speakers, even if headphones are connected.
+	u8 playOnSleep; ///< Set to 0 to pause the sound on sleep and 1 to continue playing on sleep. 
+	u8 padding1; ///< Padding? Never used.
+} CSND_DirectSoundModifiers;
+
+typedef struct
+{
+	u8 always0; ///< Always set to 0 by applets.
+	u8 soundOutputMode; ///< Output mode (Mono or Stereo).
+	u8 padding[2]; ///< Padding? Never used.
+	CSND_DirectSoundChannelData channelData; ///< Channel related data.
+	CSND_DirectSoundModifiers soundModifiers; ///< Modifiers applied to sound playback.
+} CSND_DirectSound;
+
 /// Channel info.
 typedef union
 {
@@ -132,6 +186,13 @@ typedef union
 extern vu32* csndSharedMem;   ///< CSND shared memory.
 extern u32 csndSharedMemSize; ///< CSND shared memory size.
 extern u32 csndChannels;      ///< Bitmask of channels that are allowed for usage.
+
+/**
+ * @brief Plays a sound with the info stored in the shared memory offset3.
+ * @param unknown0 Unknown, default 0.
+ * @param unknown1 Unknwon, may be which channel to play the sound on.
+*/
+Result CSND_PlaySoundDirectly(u32 unknown0, u32 unknown1);
 
 /**
  * @brief Acquires a capture unit.
@@ -385,6 +446,19 @@ Result CSND_UpdateInfo(bool waitDone);
  * @param adpcmIndex ADPCM index.
  */
 void csndSetNextAdpcmState(int adpcmSample, int adpcmIndex);
+
+/**
+ * @brief Initializes a direct sound to the default values.
+ * @param sound Pointer to a direct sound struct.
+*/
+void csndInitializeDirectSound(CSND_DirectSound* sound);
+
+/**
+ * @brief Plays a direct sound.
+ * @param sound Pointer to a direct sound struct.
+ * @param isVAddr Whether sound.channelData.sampleData hold virtual addresses (true) or physical addresses (false).
+*/
+Result csndPlayDirectSound(CSND_DirectSound* sound, bool isVAddr);
 
 /**
  * @brief Plays a sound.
