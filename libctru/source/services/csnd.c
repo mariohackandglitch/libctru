@@ -72,14 +72,18 @@ static Result CSND_ExecuteCommands(u32 offset)
 	return (Result)cmdbuf[1];
 }
 
-Result CSND_PlaySoundDirectly(u32 unknown0, u32 unknown1)
+Result CSND_PlaySoundDirectly(u32 channel, u32 priority)
 {
 	Result ret=0;
+
+	// If the values are outside the range, CSND crashes.
+	if (channel > 3 || priority > 31) return MAKERESULT(RL_PERMANENT, RS_INVALIDARG, RM_CSND, RD_OUT_OF_RANGE);
+
 	u32 *cmdbuf = getThreadCommandBuffer();
 
 	cmdbuf[0] = IPC_MakeHeader(0x4,2,0); // 0x40080
-	cmdbuf[1] = unknown0;
-	cmdbuf[2] = unknown1;
+	cmdbuf[1] = channel;
+	cmdbuf[2] = priority;
 
 	if(R_FAILED(ret = svcSendSyncRequest(csndHandle)))return ret;
 
@@ -546,7 +550,7 @@ void csndInitializeDirectSound(CSND_DirectSound* sound)
 	sound->soundModifiers.speedMultiplier = 1.f;
 }
 
-Result csndPlayDirectSound(CSND_DirectSound* sound, bool isVAddr)
+Result csndPlayDirectSound(CSND_DirectSound* sound, u32 chn, u32 priority, bool isVAddr)
 {
 	if (isVAddr)
 	{
@@ -557,7 +561,7 @@ Result csndPlayDirectSound(CSND_DirectSound* sound, bool isVAddr)
 	CSND_DirectSound* sharedMemSound = (CSND_DirectSound*)((vu8*)csndSharedMem + csndOffsets[3]);
 	memcpy(sharedMemSound, sound, sizeof(CSND_DirectSound));
 
-	return CSND_PlaySoundDirectly(0, 0);
+	return CSND_PlaySoundDirectly(chn, priority);
 }
 
 static Result csndPlaySoundImpl(int chn, u32 flags, u32 sampleRate, float vol, float pan, u32 paddr0, u32 paddr1, u32 size, int adpcmSample, int adpcmIndex)

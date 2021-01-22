@@ -124,7 +124,7 @@ typedef struct
 	u8 padding[2]; ///< Padding.
 	u32 sampleRate; ///< Sample rate for both channels.
 	void* sampleData[2]; ///< Pointers to the sample data linear memory buffers (must be equal size).
-	u32 sampleDataLength; ///< Size of the sample data buffer (for a single channel).
+	u32 sampleDataLength; ///< Size of an individual sample data buffer in bytes.
 	CSND_DirectSoundIMAADPCMContext adpcmContext[2]; ///< IMA ADPCM context for each channel.
 } CSND_DirectSoundChannelData;
 
@@ -143,10 +143,11 @@ typedef struct
 	u8 padding1; ///< Padding? Never used.
 } CSND_DirectSoundModifiers;
 
+/// Direct sound struct.
 typedef struct
 {
 	u8 always0; ///< Always set to 0 by applets.
-	u8 soundOutputMode; ///< Output mode (Mono or Stereo).
+	u8 soundOutputMode; ///< Output mode (CSND_SoundOutputMode).
 	u8 padding[2]; ///< Padding? Never used.
 	CSND_DirectSoundChannelData channelData; ///< Channel related data.
 	CSND_DirectSoundModifiers soundModifiers; ///< Modifiers applied to sound playback.
@@ -189,10 +190,10 @@ extern u32 csndChannels;      ///< Bitmask of channels that are allowed for usag
 
 /**
  * @brief Plays a sound with the info stored in the shared memory offset3.
- * @param unknown0 Unknown, default 0.
- * @param unknown1 Unknwon, may be which channel to play the sound on.
+ * @param channel Direct sound channel to use. Range [0, 3].
+ * @param priority Direct sound priority, used if the channel is already playing. Smaller value -> Higher priority. Range [0, 31].
 */
-Result CSND_PlaySoundDirectly(u32 unknown0, u32 unknown1);
+Result CSND_PlaySoundDirectly(u32 channel, u32 priority);
 
 /**
  * @brief Acquires a capture unit.
@@ -456,9 +457,11 @@ void csndInitializeDirectSound(CSND_DirectSound* sound);
 /**
  * @brief Plays a direct sound.
  * @param sound Pointer to a direct sound struct.
+ * @param chn Direct sound channel to use. Range [0, 3].
+ * @param priority Direct sound priority, used if the channel is already playing. Smaller value -> Higher priority. Range [0, 31].
  * @param isVAddr Whether sound.channelData.sampleData hold virtual addresses (true) or physical addresses (false).
 */
-Result csndPlayDirectSound(CSND_DirectSound* sound, bool isVAddr);
+Result csndPlayDirectSound(CSND_DirectSound* sound, u32 chn, u32 priority, bool isVAddr);
 
 /**
  * @brief Plays a sound.
